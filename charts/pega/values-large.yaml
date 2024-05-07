@@ -124,6 +124,9 @@ global:
       serviceHost: "API_SERVICE_ADDRESS"
       httpsServicePort: "SERVICE_PORT_HTTPS"
 
+  pegaDiagnosticUser: ""
+  pegaDiagnosticPassword: ""
+
   # Specify the Pega tiers to deploy
   tier:
     - name: "web"
@@ -169,6 +172,7 @@ global:
             insecureSkipVerify: false
 
       ingress:
+        enabled: true
         # For help configuring the ingress block, see the Helm chart documentation
         # https://github.com/pegasystems/pega-helm-charts/blob/master/charts/pega/README.md#ingress
 
@@ -202,8 +206,6 @@ global:
       javaOpts: ""
       # Check the 'JVM Arguments' section in https://github.com/pegasystems/pega-helm-charts/blob/master/charts/pega/README.md
       catalinaOpts: "-XX:InitialCodeCacheSize=256M -XX:ReservedCodeCacheSize=512M -XX:MetaspaceSize=512M"
-      pegaDiagnosticUser: ""
-      pegaDiagnosticPassword: ""
 
       deploymentStrategy:
         rollingUpdate:
@@ -251,9 +253,6 @@ global:
       replicas: 1
       javaOpts: ""
 
-      pegaDiagnosticUser: ""
-      pegaDiagnosticPassword: ""
-
       deploymentStrategy:
         rollingUpdate:
           maxSurge: 1
@@ -292,6 +291,7 @@ global:
         targetPort: 7003
 
       ingress:
+        enabled: true
         # Enter the domain name to access web nodes via a load balancer.
         #  e.g. web.mypega.example.com
         domain: "YOUR_STREAM_NODE_DOMAIN"
@@ -334,9 +334,6 @@ global:
       replicas: 1
       javaOpts: ""
 
-      pegaDiagnosticUser: ""
-      pegaDiagnosticPassword: ""
-
       deploymentStrategy:
         rollingUpdate:
           maxSurge: 1
@@ -363,9 +360,6 @@ global:
 
       replicas: 1
       javaOpts: ""
-
-      pegaDiagnosticUser: ""
-      pegaDiagnosticPassword: ""
 
       deploymentStrategy:
         rollingUpdate:
@@ -421,10 +415,21 @@ dds:
 # Elasticsearch deployment settings.
 # Note: This Elasticsearch deployment is used for Pega search, and is not the same Elasticsearch deployment used by the EFK stack.
 # These search nodes will be deployed regardless of the Elasticsearch configuration above.
-# Refer to README document to configure `Search and Reporting Service` as a search functionality provider under this section.
 pegasearch:
   image: "pegasystems/search"
   memLimit: "3Gi"
+
+  # Set externalSearchService to true to use the Search and Reporting Service.
+  # Refer to the README document to configure SRS as a search functionality provider under this section.
+  externalSearchService: false
+  externalURL:
+  srsAuth:
+    enabled: false
+    url: ""
+    clientId: ""
+    authType: ""
+    privateKey: ""
+    external_secret_name: ""
 
 # Pega Installer settings
 installer:

@@ -12,7 +12,7 @@ k8s         | Open-source Kubernetes
 openshift   | Red Hat Openshift
 eks         | Amazon Elastic Kubernetes Service (EKS)
 gke         | Google Kubernetes Engine (GKE)
-pks         | VMware Tanzu Kubernetes Grid Integrated Edition (TKGI), which used to be Pivotal Container Service (PKS)
+pks         | VMware Tanzu Kubernetes Grid Integrated Edition (TKGI), which used to be Pivotal Container Service (PKS) (**Note:** VMware Tanzu Kubernetes Grid Integrated Edition (TKGI) was deprecated for all releases in February 2024. Current deployments on TKGI continue to be supported, but as a best practice, do not use TKGI for new deployments of Pega Platform.)
 aks         | Microsoft Azure Kubernetes Service (AKS)
 
 Example for a kubernetes environment:
@@ -41,6 +41,19 @@ Example:
 
 ```yaml
 action: "deploy"
+```
+## Kerberos Configuration
+
+Use the `kerberos` section to configure Kerberos authentication for Decisioning data flows that fetch data from Kafka or HBase streams. For more information on Decisioning data flows that use Kerberos, see [Data Set types](https://docs.pega.com/bundle/platform/page/platform/decision-management/data-set-types.html).
+
+To configure Kerberos authentication, provide the contents of your krb5.conf file n the `krb5.conf` parameter. For more information, see official Kerberos documentation.
+
+For example:
+```yaml
+global:
+  kerberos:
+    krb5.conf: |
+      ----SAMPLE KRB5.CONF----
 ```
 
 ## JDBC Configuration
@@ -331,7 +344,7 @@ service:
 
 ### ingress
 
-Specify the `ingress` yaml block to expose a Pega tier to access from outside Kubernetes. Pega supports the use of managing SSL certificates for HTTPS configuration using a variety of methods. For more information on services, see the [Kubernetes Documentation](https://kubernetes.io/docs/concepts/services-networking/ingress/).
+Specify the `ingress` yaml block to expose a Pega tier to access from outside Kubernetes. Pega supports the use of managing SSL certificates for HTTPS configuration using a variety of methods. Set `ingress.enabled` to true in order to deploy an ingress for the tier. For more information on services, see the [Kubernetes Documentation](https://kubernetes.io/docs/concepts/services-networking/ingress/).
 
 Parameter | Description
 ---       | ---
@@ -444,15 +457,17 @@ ingress:
 
 You can optionally configure the resource allocation and limits for a tier using the following parameters. The default value is used if you do not specify an alternative value. See [Managing Kubernetes Resources](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/) for more information about how Kubernetes manages resources.
 
-Parameter       | Description                                            | Default value
----             | ---                                                    | ---
-`replicas`      | Specify the number of Pods to deploy in the tier.      | `1`
-`cpuRequest`    | Initial CPU request for pods in the current tier.      | `3`
-`cpuLimit`      | CPU limit for pods in the current tier.                | `4`
-`memRequest`    | Initial memory request for pods in the current tier.   | `12Gi`
-`memLimit`      | Memory limit for pods in the current tier.             | `12Gi`
-`initialHeap`   | Specify the initial heap size of the JVM.              | `8192m`
-`maxHeap`       | Specify the maximum heap size of the JVM.              | `8192m`
+Parameter                | Description                                            | Default value
+---                      | ---                                                    | ---
+`replicas`               | Specify the number of Pods to deploy in the tier.      | `1`
+`cpuRequest`             | Initial CPU request for pods in the current tier.      | `3`
+`cpuLimit`               | CPU limit for pods in the current tier.                | `4`
+`memRequest`             | Initial memory request for pods in the current tier.   | `12Gi`
+`memLimit`               | Memory limit for pods in the current tier.             | `12Gi`
+`initialHeap`            | Specify the initial heap size of the JVM.              | `8192m`
+`maxHeap`                | Specify the maximum heap size of the JVM.              | `8192m`
+`ephemeralStorageRequest`| Ephemeral storage request for the tomcat container.    | -
+`ephemeralStorageLimit`  | Ephemeral storage limit for the tomcat container.      | -
 
 ### JVM Arguments
 You can optionally pass in JVM arguments to Tomcat.  Depending on the parameter/attribute used, the arguments will be placed into `JAVA_OPTS` or `CATALINA_OPTS` environmental variables.
@@ -582,6 +597,25 @@ tier:
   - name: my-tier
     custom:
       serviceAccountName: MY_SERVICE_ACCOUNT_NAME
+```
+
+### Custom volumes
+
+You can optionally specify custom `volumes` and `volumeMounts` for your deployment tier. You need to grant read and/or write permissions to the volume location to the Pega user depending on the purpose of the volume. By default, the Pega user UID is 9001.
+
+For example:
+
+```yaml
+tier:
+  - name: my-tier
+    custom:
+      volumeMounts:
+        - name: my-volume
+          mountPath: /path/to/mount
+      volumes:
+        - name: my-volume
+          configMap:
+            name: my-configmap 
 ```
 
 ### Sidecar Containers
@@ -832,10 +866,12 @@ To configure authorization for the connection between Pega Infinity and the Sear
 | Parameter             | Description                                                                                                                                                                                           | Default value      |
 |-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------|
 | `enabled`             | Set the `pegasearch.srsAuth.enabled` to 'true' to use OAuth between Infinity and SRS.                                                                                                                 | false              |
-| `url`                 | Set the `pegasearch.srsAuth.url` value to the URL of the OAuth service endpoint to get the token for SRS.                                                                                             | `""`               |
+| `url`                 | Set the `pegasearch.srsAuth.url` value to the URL of the OAuth token endpoint to get the token for SRS.                                                                                             | `""`               |
 | `clientId`            | Set the `pegasearch.srsAuth.clientId` value to the client id used in OAuth service.                                                                                                                   | `""`               |
 | `scopes`              | Set the `pegasearch.srsAuth.scopes` value to "pega.search:full", the scope set in the OAuth service required to grant access to SRS.                                                                  | "pega.search:full" |
-| `privateKey`          | Set the `pegasearch.srsAuth,privateKey` value to the OAuth private PKCS8 key (additionally encoded with base64) used to get an authorization token for the connection between Pega tiers and SRS.     | `""`               |
+| `authType`            | Set the `pegasearch.srsAuth.authType` value to to authentication type use when connecting to the OAuth token endpoint. Use client_secret_basic for basic authentication or private_key_jwt to use a client assertion JWT.     | `""`               |
+| `external_secret_name`| Set the `pegasearch.srsAuth.external_secret_name` value to the secret that contains the OAuth private PKCS8 key (additionally encoded with base64) used to get an authorization token for the connection between Pega tiers and SRS.  The private key should be contained in the secret key SRS_OAUTH_PRIVATE_KEY.   | `""`               |
+| `privateKey`          | When not using an external secret, set the `pegasearch.srsAuth.privateKey` value to the OAuth private PKCS8 key (additionally encoded with base64) used to get an authorization token for the connection between Pega tiers and SRS.     | `""`               |
 | `privateKeyAlgorithm` | Set the `pegasearch.srsAuth.privateKeyAlgorithm` value to the algorithm used to generate a private key used by the OAuth client. Allowed values: RS256 (default), RS384, RS512, ES256, ES384, ES512.  | "RS256"            |
 
 Example:
@@ -848,6 +884,7 @@ pegasearch:
     enabled: true
     url: "https:/your-authorization-service-host/oauth2/v1/token"
     clientId: "your-client-id"
+    authType: client_secret_basic
     scopes: "pega.search:full"
     privateKey: "LS0tLS1CRUdJTiBSU0Eg...<truncated>"
     privateKeyAlgorithm: "RS256"

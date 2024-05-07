@@ -169,6 +169,11 @@ spec:
           value: {{ .nodeType }}
         - name: PEGA_APP_CONTEXT_PATH
           value: {{ template "pega.applicationContextPath" . }}
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
 {{- if .node.requestor }}
         - name: REQUESTOR_PASSIVATION_TIMEOUT
           value: "{{ .node.requestor.passivationTimeSec }}"
@@ -198,11 +203,19 @@ spec:
         - name: MAX_RETRIES
           value: {{ include "tierClassloaderMaxRetries" (dict "failureThreshold" $livenessProbeFailureThreshold "periodSeconds" $livenessProbePeriodSeconds ) | quote }}
 {{- if and (.root.Values.pegasearch.externalSearchService) ((.root.Values.pegasearch.srsAuth).enabled) }}
+{{- if or (not .root.Values.pegasearch.srsAuth.authType) (eq .root.Values.pegasearch.srsAuth.authType "private_key_jwt") }}
         - name: SERV_AUTH_PRIVATE_KEY
           valueFrom:
             secretKeyRef:
-              name: pega-srs-auth-secret
-              key: privateKey
+{{- include "srsAuthEnvSecretFrom"  .root | indent 14 }}
+{{- else if eq .root.Values.pegasearch.srsAuth.authType "client_secret_basic" }}
+        - name: SERV_AUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+{{- include "srsAuthEnvSecretFrom"  .root | indent 14 }}
+{{- else }}
+  {{- fail "pegasearch.srsAuth.authType must be either private_key_jwt or client_secret_basic." }}
+{{- end }}
 {{- end }}
         envFrom:
         - configMapRef:
@@ -220,6 +233,9 @@ spec:
           {{- else }}
             memory: "12Gi"
           {{- end }}
+          {{- if .node.ephemeralStorageLimit }}
+            ephemeral-storage: "{{ .node.ephemeralStorageLimit }}"
+          {{- end }}
           # CPU and Memory that the containers for {{ .name }} request
           requests:
           {{- if .node.cpuRequest }}
@@ -231,6 +247,9 @@ spec:
             memory: "{{ .node.memRequest }}"
           {{- else }}
             memory: "12Gi"
+          {{- end }}
+          {{- if .node.ephemeralStorageRequest }}
+            ephemeral-storage: "{{ .node.ephemeralStorageRequest }}"
           {{- end }}
         volumeMounts:
         # The given mountpath is mapped to volume with the specified name.  The config map files are mounted here.
